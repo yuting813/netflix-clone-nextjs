@@ -24,8 +24,12 @@ function Header() {
 	}, []);
 
 	return (
-		<header className={`${isScrolled && 'bg-[#141414]'}`}>
-			<div className='flex items-center space-x-2 md:space-x-6'>
+		<header
+			className={`fixed top-0 w-full transition-all duration-300 ${
+				isScrolled ? 'bg-[#141414]' : 'headerLinkColor'
+			}`}
+		>
+			<div className='flex items-center space-x-2 md:space-x-8'>
 				<Image
 					src='/logo.svg'
 					width={40}
@@ -45,9 +49,9 @@ function Header() {
 				</ul>
 			</div>
 			<div className='flex items-center space-x-4 text-sm font-light'>
-				<SearchIcon className='hidden h-6 w-6 sm:inline' />
-				<p className='hidden lg:inline'>Kids</p>
-				<BellIcon className=' h-6 w-6' />
+				<SearchIcon className='hidden h-6 w-6 sm:inline headerLink' />
+				<p className='hidden lg:inline headerLink'>Kids</p>
+				<BellIcon className=' h-6 w-6 headerLink' />
 				<img
 					src='https://rb.gy/g1pwyx'
 					alt='logout'
