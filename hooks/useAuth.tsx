@@ -7,7 +7,7 @@ import {
 	User,
 } from 'firebase/auth';
 import { useRouter } from 'next/router';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
 
 // 自動登出時間設置（毫秒）
@@ -60,7 +60,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 					// Not logged in...
 					setUser(null);
 					try {
-						if (router.pathname !== '/login') {
+						// 允許訪問登入和註冊頁面
+						const publicPaths = ['/login', '/signup'];
+						if (!publicPaths.includes(router.pathname)) {
 							router.push('/login');
 						}
 					} catch (error) {
@@ -70,7 +72,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
 				setInitialLoading(false);
 			}),
-		[auth, router],
+		[router],
 	);
 
 	useEffect(() => {
@@ -94,50 +96,54 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 		};
 	}, [user]);
 
-	const resetError = () => {
+	const resetError = useCallback(() => {
 		setError(null);
-	};
+	}, []);
 
-	const signIn = async (email: string, password: string) => {
-		setLoading(true);
-		resetError();
-		try {
-			const userCredential = await signInWithEmailAndPassword(auth, email, password);
-			setUser(userCredential.user);
-			return { success: true };
-		} catch (error) {
-			const authError = error as AuthError;
-			console.error('登入錯誤:', authError);
-			// 根據 Firebase 錯誤代碼進行處理，例如顯示錯誤訊息給使用者，或者根據錯誤代碼進行其他動作
-			return {
-				success: false,
-				error: authError.code,
-			};
-		} finally {
-			setLoading(false);
-		}
-	};
+	const signIn = useCallback(
+		async (email: string, password: string) => {
+			setLoading(true);
+			resetError();
+			try {
+				const userCredential = await signInWithEmailAndPassword(auth, email, password);
+				setUser(userCredential.user);
+				return { success: true };
+			} catch (error) {
+				const authError = error as AuthError;
+				console.error('登入錯誤:', authError);
+				return {
+					success: false,
+					error: authError.code,
+				};
+			} finally {
+				setLoading(false);
+			}
+		},
+		[resetError],
+	);
 
-	const signUp = async (email: string, password: string) => {
-		setLoading(true);
-		resetError();
-		try {
-			const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-			console.log(userCredential.user);
-			setUser(userCredential.user);
-			return { success: true };
-		} catch (error) {
-			const authError = error as AuthError;
-			console.error('註冊錯誤:', authError);
-			// 根據 Firebase 錯誤代碼進行處理，例如顯示錯誤訊息給使用者，或者根據錯誤代碼進行其他動作
-			return {
-				success: false,
-				error: authError.code,
-			};
-		} finally {
-			setLoading(false);
-		}
-	};
+	const signUp = useCallback(
+		async (email: string, password: string) => {
+			setLoading(true);
+			resetError();
+			try {
+				const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+				console.log(userCredential.user);
+				setUser(userCredential.user);
+				return { success: true };
+			} catch (error) {
+				const authError = error as AuthError;
+				console.error('註冊錯誤:', authError);
+				return {
+					success: false,
+					error: authError.code,
+				};
+			} finally {
+				setLoading(false);
+			}
+		},
+		[resetError],
+	);
 
 	const logout = async () => {
 		setLoading(true);
@@ -163,7 +169,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 			error,
 			resetError,
 		}),
-		[user, loading, error],
+		[user, loading, error, signIn, signUp, resetError],
 	);
 
 	return (
