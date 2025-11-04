@@ -13,7 +13,7 @@ import Row from '@/components/Row';
 import useAuth from '@/hooks/useAuth';
 import useList from '@/hooks/useList';
 import useSubscription from '@/hooks/useSubscription';
-import { modalState, movieState } from '@/atoms/modalAtom';
+import { modalState } from '@/atoms/modalAtom';
 import { db } from '@/firebase';
 import { Movie } from '@/typings';
 import requests from '@/utils/request';
@@ -50,7 +50,6 @@ const Home = ({
 		error: subscriptionError,
 	} = useSubscription(user);
 	const showModal = useRecoilValue(modalState);
-	const movie = useRecoilValue(movieState);
 	const list = useList(user?.uid);
 
 	useEffect(() => {
@@ -122,11 +121,11 @@ const Home = ({
 				<Banner netflixOriginals={netflixOriginals} />
 
 				<section className='md:space-y-24'>
-					<Row title='Trending Now' movies={trendingNow} />
+					<Row title='Trending Now' movies={trendingNow} orientation='poster' />
+					{/* My List */}
+					{list.length > 0 && <Row title='My List' movies={list} orientation='poster' />}
 					<Row title='Top Rated' movies={topRated} />
 					<Row title='Action Thrillers' movies={actionMovies} />
-					{/* My List */}
-					{list.length > 0 && <Row title='My List' movies={list} />}
 					<Row title='Comedies' movies={comedyMovies} />
 					<Row title='Scary Movies' movies={horrorMovies} />
 					<Row title='Romance Movies' movies={romanceMovies} />
