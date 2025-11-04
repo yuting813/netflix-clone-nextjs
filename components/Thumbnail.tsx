@@ -7,19 +7,27 @@ import { Movie } from '@/typings';
 
 interface Props {
 	movie: Movie | DocumentData;
+	orientation?: 'backdrop' | 'poster';
 }
 
-function Thumbnail({ movie }: Props) {
+function Thumbnail({ movie, orientation = 'backdrop' }: Props) {
 	// These state variables are used by parent/sibling components through Recoil
-	const [showModal, setShowModal] = useRecoilState(modalState);
-	const [currentMovie, setCurrentMovie] = useRecoilState(movieState);
+	// we only need the setters here; discard the first element to avoid unused var lint
+	const [, setShowModal] = useRecoilState(modalState);
+	const [, setCurrentMovie] = useRecoilState(movieState);
 	const [imageError, setImageError] = useState(false);
-	const imagePath = movie.poster_path || movie.backdrop_path;
+	// choose poster for portrait, otherwise backdrop
+	const imagePath =
+		orientation === 'poster'
+			? movie.poster_path || movie.backdrop_path
+			: movie.backdrop_path || movie.poster_path;
+	const containerClass =
+		orientation === 'poster'
+			? 'relative h-64 min-w-[150px] cursor-pointer transition-transform duration-200 ease-out md:h-80 md:min-w-[200px] md:hover:scale-105'
+			: 'relative h-28 min-w-[180px] cursor-pointer transition-transform duration-200 ease-out md:h-36 md:min-w-[260px] md:hover:scale-105';
 	return (
 		<div
-			className={
-				'relative h-28 min-w-[180px] cursor-pointer transition duration-200 ease-out md:h-36 md:min-w-[260px] md:hover:scale-105'
-			}
+			className={containerClass}
 			onClick={() => {
 				setCurrentMovie(movie);
 				setShowModal(true);
@@ -34,12 +42,13 @@ function Thumbnail({ movie }: Props) {
 				alt={movie.title || movie.name || 'Movie poster'}
 				className='rounded-sm object-cover md:rounded'
 				fill={true}
-				sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+				sizes={
+					orientation === 'poster'
+						? '(max-width: 768px) 40vw, (max-width: 1200px) 20vw, 12vw'
+						: '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+				}
 				onError={() => {
-					console.error(
-						'Failed to load image for movie: ${ movie.title || movie.name }',
-						imagePath,
-					);
+					console.error(`Failed to load image for movie: ${movie.title || movie.name}`, imagePath);
 					setImageError(true);
 				}}
 			/>
