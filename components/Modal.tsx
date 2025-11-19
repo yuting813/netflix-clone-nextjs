@@ -3,7 +3,7 @@ import { VolumeUpIcon } from '@heroicons/react/solid';
 import MuiModal from '@mui/material/Modal';
 import { collection, deleteDoc, doc, DocumentData, onSnapshot, setDoc } from 'firebase/firestore';
 import { useRecoilState } from 'recoil';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { FaPause, FaPlay } from 'react-icons/fa';
 import ReactPlayer from 'react-player/lazy';
@@ -15,6 +15,8 @@ import { Element, Genre, Movie } from '../typings';
 function Modal() {
 	const [showModal, setShowModal] = useRecoilState(modalState);
 	const [movie] = useRecoilState(movieState);
+	const triggerElementRef = useRef<HTMLElement | null>(null);
+	const modalRef = useRef<HTMLDivElement | null>(null);
 	const [trailer, setTrailer] = useState('');
 	const [genres, setGenres] = useState<Genre[]>([]);
 	const [muted, setMuted] = useState(true);
@@ -132,7 +134,67 @@ function Modal() {
 
 	const handleClose = () => {
 		setShowModal(false);
+		// Return focus to the trigger element (e.g., Thumbnail that opened the modal)
+		setTimeout(() => {
+			triggerElementRef.current?.focus();
+		}, 0);
 	};
+
+	// Store reference to the element that triggered the modal open
+	useEffect(() => {
+		if (showModal) {
+			triggerElementRef.current = document.activeElement as HTMLElement;
+		}
+	}, [showModal]);
+
+	// Focus trap: keep focus inside modal while open
+	useEffect(() => {
+		const handleTabKey = (e: KeyboardEvent) => {
+			if (e.key !== 'Tab' || !modalRef.current) return;
+
+			const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+
+			if (focusableElements.length === 0) return;
+
+			const firstElement = focusableElements[0];
+			const lastElement = focusableElements[focusableElements.length - 1];
+			const activeElement = document.activeElement;
+
+			if (e.shiftKey) {
+				if (activeElement === firstElement) {
+					e.preventDefault();
+					lastElement.focus();
+				}
+			} else {
+				if (activeElement === lastElement) {
+					e.preventDefault();
+					firstElement.focus();
+				}
+			}
+		};
+
+		if (showModal) {
+			window.addEventListener('keydown', handleTabKey);
+			// Move focus to first focusable element
+			modalRef.current?.querySelector<HTMLElement>('button')?.focus();
+		}
+
+		return () => window.removeEventListener('keydown', handleTabKey);
+	}, [showModal]);
+
+	// Close modal on Escape key press for accessibility
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				setShowModal(false);
+			}
+		};
+
+		if (showModal) window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [showModal]);
 
 	// Quick UX handlers for Play and ThumbUp buttons
 	const handlePlayClick = () => {
@@ -170,7 +232,7 @@ function Modal() {
 			onClose={handleClose}
 			className='fixex !top-7 left-0 right-0 z-50 mx-auto w-full max-w-5xl overflow-hidden overflow-y-scroll rounded-md scrollbar-hide'
 		>
-			<>
+			<div ref={modalRef}>
 				<Toaster position='bottom-center' />
 				<button
 					onClick={handleClose}
@@ -187,6 +249,12 @@ function Modal() {
 						style={{ position: 'absolute', top: '0', left: '0' }}
 						playing={playing}
 						muted={muted}
+						onPlay={() => {
+							setPlaying(true);
+							setIsPlayingBtn(true);
+							setTimeout(() => setIsPlayingBtn(false), 1200);
+						}}
+						onPause={() => setPlaying(false)}
 						onEnded={() => setPlaying(false)}
 					/>
 					<div className='absolute bottom-2 flex w-full items-center justify-between px-4 sm:bottom-10 sm:px-10'>
@@ -334,7 +402,7 @@ function Modal() {
 						</div>
 					</div>
 				</div>
-			</>
+			</div>
 		</MuiModal>
 	);
 }
