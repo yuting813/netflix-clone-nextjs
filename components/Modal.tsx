@@ -3,7 +3,7 @@ import { VolumeUpIcon } from '@heroicons/react/solid';
 import MuiModal from '@mui/material/Modal';
 import { collection, deleteDoc, doc, DocumentData, onSnapshot, setDoc } from 'firebase/firestore';
 import { useRecoilState } from 'recoil';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { FaPause, FaPlay } from 'react-icons/fa';
 import ReactPlayer from 'react-player/lazy';
@@ -15,6 +15,8 @@ import { Element, Genre, Movie } from '../typings';
 function Modal() {
 	const [showModal, setShowModal] = useRecoilState(modalState);
 	const [movie] = useRecoilState(movieState);
+	const triggerElementRef = useRef<HTMLElement | null>(null);
+	const modalRef = useRef<HTMLDivElement | null>(null);
 	const [trailer, setTrailer] = useState('');
 	const [genres, setGenres] = useState<Genre[]>([]);
 	const [muted, setMuted] = useState(true);
@@ -132,7 +134,67 @@ function Modal() {
 
 	const handleClose = () => {
 		setShowModal(false);
+		// Return focus to the trigger element (e.g., Thumbnail that opened the modal)
+		setTimeout(() => {
+			triggerElementRef.current?.focus();
+		}, 0);
 	};
+
+	// Store reference to the element that triggered the modal open
+	useEffect(() => {
+		if (showModal) {
+			triggerElementRef.current = document.activeElement as HTMLElement;
+		}
+	}, [showModal]);
+
+	// Focus trap: keep focus inside modal while open
+	useEffect(() => {
+		const handleTabKey = (e: KeyboardEvent) => {
+			if (e.key !== 'Tab' || !modalRef.current) return;
+
+			const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			);
+
+			if (focusableElements.length === 0) return;
+
+			const firstElement = focusableElements[0];
+			const lastElement = focusableElements[focusableElements.length - 1];
+			const activeElement = document.activeElement;
+
+			if (e.shiftKey) {
+				if (activeElement === firstElement) {
+					e.preventDefault();
+					lastElement.focus();
+				}
+			} else {
+				if (activeElement === lastElement) {
+					e.preventDefault();
+					firstElement.focus();
+				}
+			}
+		};
+
+		if (showModal) {
+			window.addEventListener('keydown', handleTabKey);
+			// Move focus to first focusable element
+			modalRef.current?.querySelector<HTMLElement>('button')?.focus();
+		}
+
+		return () => window.removeEventListener('keydown', handleTabKey);
+	}, [showModal]);
+
+	// Close modal on Escape key press for accessibility
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				setShowModal(false);
+			}
+		};
+
+		if (showModal) window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [showModal]);
 
 	// Quick UX handlers for Play and ThumbUp buttons
 	const handlePlayClick = () => {
@@ -170,7 +232,7 @@ function Modal() {
 			onClose={handleClose}
 			className='fixex !top-7 left-0 right-0 z-50 mx-auto w-full max-w-5xl overflow-hidden overflow-y-scroll rounded-md scrollbar-hide'
 		>
-			<>
+			<div ref={modalRef}>
 				<Toaster position='bottom-center' />
 				<button
 					onClick={handleClose}
@@ -187,16 +249,23 @@ function Modal() {
 						style={{ position: 'absolute', top: '0', left: '0' }}
 						playing={playing}
 						muted={muted}
+						onPlay={() => {
+							setPlaying(true);
+							setIsPlayingBtn(true);
+							setTimeout(() => setIsPlayingBtn(false), 1200);
+						}}
+						onPause={() => setPlaying(false)}
 						onEnded={() => setPlaying(false)}
 					/>
-					<div className='absolute bottom-10 flex w-full items-center justify-between px-10'>
-						<div className='flex space-x-2'>
+					<div className='absolute bottom-2 flex w-full items-center justify-between px-4 sm:bottom-10 sm:px-10'>
+						{/* Desktop controls: large play button + small buttons */}
+						<div className='hidden items-center space-x-2 sm:flex'>
 							<button
 								onClick={handlePlayClick}
 								aria-pressed={playing}
 								aria-label='Play trailer'
 								className={
-									'flex items-center gap-x-2 rounded px-8 text-xl font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-2 ' +
+									'flex items-center gap-x-2 rounded px-8 py-2 text-xl font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-2 ' +
 									(isPlayingBtn
 										? 'scale-95 transform bg-green-500 text-white hover:bg-green-600'
 										: playing
@@ -252,6 +321,48 @@ function Modal() {
 								<ThumbUpIcon className='h-7 w-7' />
 							</button>
 						</div>
+
+						{/* Mobile controls: Play (rectangular, smaller), Add, Like, Muted — evenly spaced */}
+						<div className='flex w-full items-center justify-around px-6 sm:hidden'>
+							<button
+								onClick={handlePlayClick}
+								aria-pressed={playing}
+								aria-label='Play trailer'
+								className={
+									'flex items-center gap-x-2 rounded px-10 py-2 text-lg font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-2 ' +
+									(isPlayingBtn
+										? 'scale-95 transform bg-green-500 text-white'
+										: playing
+											? 'bg-green-600 text-white'
+											: 'bg-white text-black')
+								}
+							>
+								{playing ? <FaPause className='h-6 w-6' /> : <FaPlay className='h-5 w-5' />}
+								<span className='hidden sm:inline-block'>{playing ? 'Pause' : 'Play'}</span>
+							</button>
+
+							<button
+								className='modalButton h-11 w-11'
+								onClick={handleList}
+								aria-label='Add to My List'
+							>
+								{addedToList ? <CheckIcon className='h-6 w-6' /> : <PlusIcon className='h-6 w-6' />}
+							</button>
+
+							<button
+								className={`modalButton h-11 w-11 ${liked ? 'scale-110 text-blue-400' : ''}`}
+								onClick={handleThumbUpClick}
+								aria-label='Like'
+							>
+								<ThumbUpIcon className='h-6 w-6' />
+							</button>
+
+							{/* <button className='modalButton h-12 w-12 SM:hidden' onClick={() => setMuted(!muted)} aria-label='Toggle mute'>
+								{muted ? <VolumeOffIcon className='h-6 w-6' /> : <VolumeUpIcon className='h-6 w-6' />}
+							</button> */}
+						</div>
+
+						{/* Mute button kept on the right (desktop + mobile) */}
 						<button className='modalButton' onClick={() => setMuted(!muted)}>
 							{muted ? <VolumeOffIcon className='h-6 w-6' /> : <VolumeUpIcon className='h-6 w-6' />}
 						</button>
@@ -291,7 +402,7 @@ function Modal() {
 						</div>
 					</div>
 				</div>
-			</>
+			</div>
 		</MuiModal>
 	);
 }
